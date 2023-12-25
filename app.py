@@ -1,78 +1,43 @@
-import sys
-import pyaudio
-import wave
-import os
-import tempfile
-import threading
-import pyperclip
-from faster_whisper import WhisperModel
-from PySide6.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel
-from PySide6.QtCore import Qt
+import streamlit as st
+import requests
 
-class VoiceRecorder:
-    def __init__(self, window, format=pyaudio.paInt16, channels=1, rate=44100, chunk=1024):
-        self.format, self.channels, self.rate, self.chunk = format, channels, rate, chunk
-        self.window = window
-        self.is_recording, self.frames = False, []
-        self.model = WhisperModel("large-v2", device="cuda", compute_type="int8_float32")
+# Sample API call function
+def make_api_call(server_url, model, messages):
+    api_endpoint = f"{server_url}/chat/completions"
+    data = {"model": model, "messages": messages}
+    response = requests.post(api_endpoint, json=data)
+    return response.json()
 
-    def transcribe_audio(self, audio_file):
-        segments, _ = self.model.transcribe(audio_file)
-        pyperclip.copy("\n".join([segment.text for segment in segments]))
-        self.window.update_status("Audio saved and transcribed")
+# Streamlit app with sidebar for custom data input
+def main():
+    st.title("LLM Playground")
 
-    def record_audio(self):
-        self.window.update_status("Recording...")
-        p = pyaudio.PyAudio()
-        try:
-            stream = p.open(format=self.format, channels=self.channels, rate=self.rate, input=True, frames_per_buffer=self.chunk)
-            [self.frames.append(stream.read(self.chunk)) for _ in iter(lambda: self.is_recording, False)]
-            stream.stop_stream()
-            stream.close()
-        finally:
-            p.terminate()
+    # Sidebar for custom data input
+    st.sidebar.title("Custom Data Input")
+    
+    # Allow users to input their server URL
+    server_url = st.sidebar.text_input("Enter Server URL", "http://localhost:4000")
 
-    def save_audio(self):
-        self.is_recording = False
-        temp_filename = tempfile.mktemp(suffix=".wav")
-        with wave.open(temp_filename, "wb") as wf:
-            wf.setnchannels(self.channels)
-            wf.setsampwidth(pyaudio.PyAudio().get_sample_size(self.format))
-            wf.setframerate(self.rate)
-            wf.writeframes(b"".join(self.frames))
-        self.transcribe_audio(temp_filename)
-        os.remove(temp_filename)
-        self.frames.clear()
+    model = st.sidebar.selectbox("Select Model", ["gpt-3.5-turbo", "command-nightly", "j2-mid"])
 
-    def start_recording(self):
-        if not self.is_recording:
-            self.is_recording = True
-            threading.Thread(target=self.record_audio).start()
+    # Allow users to add multiple messages
+    messages = []
+    message_count = st.sidebar.number_input("Number of Messages", value=1, min_value=1, max_value=10)
+    for i in range(message_count):
+        role = st.sidebar.selectbox(f"Role for Message {i+1}", ["user", "assistant"])
+        content = st.sidebar.text_area(f"Content for Message {i+1}")
+        messages.append({"role": role, "content": content})
 
-class MyWindow(QWidget):
-    def __init__(self):
-        super().__init__()
-        self.recorder = VoiceRecorder(self)
-        layout = QVBoxLayout(self)
+    # Streamlit main content
+    st.subheader("Preview Messages")
+    st.json(messages)
 
-        for text, callback in [("Record", self.recorder.start_recording), 
-                               ("Stop and Copy to Clipboard", self.recorder.save_audio)]:
-            button = QPushButton(text, self)
-            button.clicked.connect(callback)
-            layout.addWidget(button)
-
-        self.status_label = QLabel('', self)
-        layout.addWidget(self.status_label)
-        self.setFixedSize(300, 150)
-        
-        self.setWindowFlag(Qt.WindowStaysOnTopHint)
-
-    def update_status(self, text):
-        self.status_label.setText(text)
+    # Call API button
+    if st.button("Call API"):
+        st.info("Calling API...")
+        response = make_api_call(server_url, model, messages)
+        st.success("API call successful!")
+        st.json(response)
 
 if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    app.setStyle('Fusion')
-    window = MyWindow()
-    window.show()
-    sys.exit(app.exec())
+    main()
