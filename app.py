@@ -1,42 +1,33 @@
 import streamlit as st
 import requests
 
-# Server URL
-SERVER_URL = "http://localhost:4000"
-
-# Sample API call function
-def make_api_call(model, messages):
-    api_endpoint = f"{SERVER_URL}/chat/completions"
-    data = {"model": model, "messages": messages}
-    response = requests.post(api_endpoint, json=data)
-    return response.json()
-
-# Streamlit app with sidebar for custom data input
 def main():
+    st.set_page_config(layout="wide")
+
     st.title("LLM Playground")
 
-    # Sidebar for custom data input
-    st.sidebar.title("Custom Data Input")
-    model = st.sidebar.selectbox("Select Model", ["gpt-3.5-turbo", "command-nightly", "j2-mid"])
+    with st.sidebar:
+        st.header("Custom Data Input")
 
-    # Allow users to add multiple messages
-    messages = []
-    message_count = st.sidebar.number_input("Number of Messages", value=1, min_value=1, max_value=10)
-    for i in range(message_count):
-        role = st.sidebar.selectbox(f"Role for Message {i+1}", ["user", "assistant"])
-        content = st.sidebar.text_area(f"Content for Message {i+1}")
-        messages.append({"role": role, "content": content})
+        server_url = st.text_input("Server URL", value="http://localhost")  # Server URL input
+        server_port = st.number_input("Server Port", value=4000, min_value=1, max_value=65535)  # Server port input
 
-    # Streamlit main content
-    st.subheader("Preview Messages")
-    st.json(messages)
+        model = st.selectbox("Select Model", ["gpt-3.5-turbo", "command-nightly", "j2-mid"])
 
-    # Call API button
-    if st.button("Call API"):
-        st.info("Calling API...")
-        response = make_api_call(model, messages)
-        st.success("API call successful!")
-        st.json(response)
+        # ... (rest of sidebar elements)
+
+    with st.container():
+        st.subheader("Preview Messages")
+        # ... (enhanced message preview)
+
+        if st.button("Call API"):
+            with st.spinner("Calling API..."):
+                SERVER_URL = f"{server_url}:{server_port}"
+                response = make_api_call(model, messages)
+            st.success("API call successful!")
+            st.json(response, expanded=True)
+
+# ... (rest of your code)
 
 if __name__ == "__main__":
     main()
