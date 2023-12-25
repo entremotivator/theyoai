@@ -6,12 +6,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import List
 
-# Configure your OpenAI API settings
-openai.api_key = os.getenv("OPENAI_API_KEY", "")
-openai.api_base = 'https://api.openai.com/v1'
-
 # Function to retrieve completions
-def get_completion(prompt, model="local model", temperature=0.0):
+def get_completion(api_key, api_base, prompt, model="local model", temperature=0.0):
+    openai.api_key = api_key
+    openai.api_base = api_base
+
     prefix = "### Instruction:\n"
     suffix = "\n### Response:"
     formatted_prompt = f"{prefix}{prompt}{suffix}"
@@ -55,9 +54,9 @@ def app():
     st.title("Jarvis Chatbot")
     os.makedirs('chat_data', exist_ok=True)
 
-    if not openai.api_key:
-        st.warning("Please set your OpenAI API key.")
-        return
+    st.sidebar.title("OpenAI Configuration")
+    openai_api_key = st.sidebar.text_input("Enter OpenAI API Key:", type="password")
+    openai_api_base = st.sidebar.text_input("Enter OpenAI API Base URL:", value='https://api.openai.com/v1')
 
     st.sidebar.title("Neuer Chat")
     neuer_chat_name = st.sidebar.text_input("Name für neuen Chat:", value="Chatname?", key="neuer_chat_name_sidebar")
@@ -86,7 +85,7 @@ def app():
 
         user_input = st.text_input("Sie:")
         if user_input:
-            response = get_completion(user_input)
+            response = get_completion(openai_api_key, openai_api_base, user_input)
             chat_history.append({"sender": "user", "message": user_input})
             chat_history.append({"sender": "Jarvis", "message": response})
             save_chat_history(st.session_state['session_key'], chat_history)
