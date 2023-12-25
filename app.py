@@ -6,7 +6,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import List
 
-# Function to retrieve completions
+# Function to retrieve completions (consider using @st.cache)
+@st.cache(allow_output_mutation=True)
 def get_completion(api_key, api_base, prompt, model="local model", temperature=0.0):
     openai.api_key = api_key
     openai.api_base = api_base
@@ -55,49 +56,23 @@ def app():
     os.makedirs('chat_data', exist_ok=True)
 
     st.sidebar.title("OpenAI Configuration")
-    openai_api_key = st.sidebar.text_input("Enter OpenAI API Key:", type="password")
-    openai_api_base = st.sidebar.text_input("Enter OpenAI API Base URL:", value='https://api.openai.com/v1')
+    openai_api_key = st.sidebar.text_input("Enter OpenAI API Key:", type="password", key="openai_api_key")
+    openai_api_base = st.sidebar.text_input("Enter OpenAI API Base URL:", value='https://api.openai.com/v1', key="openai_api_base")
 
-    st.sidebar.title("Neuer Chat")
-    neuer_chat_name = st.sidebar.text_input("Name für neuen Chat:", value="Chatname?", key="neuer_chat_name_sidebar")
-
-    if st.sidebar.button("Neuer Chat"):
-        st.session_state['session_key'] = neuer_chat_name
-        save_chat_history(st.session_state['session_key'], [])  # Create a new empty chat history file
-        save_session_index(st.session_state['session_key'])
-
-    st.sidebar.markdown("---", unsafe_allow_html=True)  # Separator
-    st.sidebar.header("Chatverlauf")  # Chat history header
-
-    try:
-        with open(Path('chat_data') / 'session_index.json', 'r') as f:
-            session_index = json.load(f)
-    except FileNotFoundError:
-        session_index = []
-    
-    for session in session_index:
-        if st.sidebar.button(session["name"]):
-            st.session_state['session_key'] = session["name"]
+    # ... (other sidebar sections)
 
     if 'session_key' in st.session_state:
-        st.header(st.session_state['session_key'])  # Display the current session name
+        st.header(st.session_state['session_key'])
         chat_history = load_chat_history(st.session_state['session_key'])
 
-        user_input = st.text_input("Sie:")
+        user_input = st.text_input("Sie:", key="user_input")
         if user_input:
             response = get_completion(openai_api_key, openai_api_base, user_input)
             chat_history.append({"sender": "user", "message": user_input})
             chat_history.append({"sender": "Jarvis", "message": response})
             save_chat_history(st.session_state['session_key'], chat_history)
 
-        for chat in chat_history:
-            sender = chat["sender"]
-            message = chat["message"]
-            with st.beta_container():
-                st.text(sender)
-                st.text(message)
-    else:
-        st.warning("Bitte erstellen Sie einen neuen Chat oder wählen Sie einenvorhandenen Chat aus.")
-        
+        # ... (chat display logic)
+
 if __name__ == "__main__":
     app()
