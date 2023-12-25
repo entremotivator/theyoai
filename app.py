@@ -3,12 +3,13 @@ import openai
 import json
 import os
 from datetime import datetime
+from typing import List
 
-# Konfigurieren Sie Ihre OpenAI API-Einstellungen
+# Configure your OpenAI API settings
 openai.api_base = 'http://localhost:1234/v1'
 openai.api_key = ''
 
-# Ihre Funktion zur Abrufung von Vervollständigungen
+# Function to retrieve completions
 def get_completion(prompt, model="local model", temperature=0.0):
     prefix = "### Instruction:\n"
     suffix = "\n### Response:"
@@ -21,8 +22,20 @@ def get_completion(prompt, model="local model", temperature=0.0):
     )
     return response.choices[0].message["content"]
 
-# Funktion für die Session-Liste
-def save_session_index(session_key):
+# Function for session index
+def save_chat_history(session_key: str, chat_history: List[dict]):
+    with open(os.path.join('chat_data', f'{session_key}_chat_history.json'), 'w') as f:
+        json.dump(chat_history, f)
+
+def load_chat_history(session_key: str) -> List[dict]:
+    try:
+        with open(os.path.join('chat_data', f'{session_key}_chat_history.json'), 'r') as f:
+            chat_history = json.load(f)
+    except FileNotFoundError:
+        chat_history = []
+    return chat_history
+
+def save_session_index(session_key: str):
     try:
         with open(os.path.join('chat_data', 'session_index.json'), 'r') as f:
             session_index = json.load(f)
@@ -38,64 +51,48 @@ def save_session_index(session_key):
 
 def app():
     st.title("Jarvis Chatbot")
-    # Unterordner bei Bedarf für JSON-Dateien erstellen
     os.makedirs('chat_data', exist_ok=True)
 
-    # Sidebar
     st.sidebar.title("Neuer Chat")
     neuer_chat_name = st.sidebar.text_input("Name für neuen Chat:", value="Chatname?", key="neuer_chat_name_sidebar")
-  
+
     if st.sidebar.button("Neuer Chat"):
         st.session_state['session_key'] = neuer_chat_name
-        save_chat_history(st.session_state['session_key'], [])  # Erstelle eine neue leere Chatverlauf-Datei
+        save_chat_history(st.session_state['session_key'], [])  # Create a new empty chat history file
         save_session_index(st.session_state['session_key'])
 
-    st.sidebar.markdown("---")  # Trennlinie
-    st.sidebar.header("Chatverlauf")  # Überschrift
+    st.sidebar.markdown("---")  # Separator
+    st.sidebar.header("Chatverlauf")  # Chat history header
 
-    # Liste vorhandener Chats
     try:
         with open(os.path.join('chat_data', 'session_index.json'), 'r') as f:
             session_index = json.load(f)
     except FileNotFoundError:
         session_index = []
+    
     for session in session_index:
         if st.sidebar.button(session["name"]):
             st.session_state['session_key'] = session["name"]
 
-    
-    # Lade den Chatverlauf
     if 'session_key' in st.session_state:
-        st.header(st.session_state['session_key'])  # Zeigt den Namen der aktuellen Session an
+        st.header(st.session_state['session_key'])  # Display the current session name
         chat_history = load_chat_history(st.session_state['session_key'])
-        
-        user_input = st.chat_input("Sie:")
+
+        user_input = st.text_input("Sie:")
         if user_input:
             response = get_completion(user_input)
             chat_history.append({"role": "user", "message": user_input})
             chat_history.append({"role": "Jarvis", "message": response})
             save_chat_history(st.session_state['session_key'], chat_history)
 
-        # Zeige den Chatverlauf
         for chat in chat_history:
             role = chat["role"]
             message = chat["message"]
-            with st.chat_message(role):
-                st.write(message)
+            with st.beta_container():
+                st.text(role)
+                st.text(message)
     else:
-        st.warning("Bitte erstellen Sie einen neuen Chat oder wählen Sie einen vorhandenen Chat aus.")
-
-def load_chat_history(session_key):
-    try:
-        with open(os.path.join('chat_data', f'{session_key}_chat_history.json'), 'r') as f:
-            chat_history = json.load(f)
-    except FileNotFoundError:
-        chat_history = []
-    return chat_history
-
-def save_chat_history(session_key, chat_history):
-    with open(os.path.join('chat_data', f'{session_key}_chat_history.json'), 'w') as f:
-        json.dump(chat_history, f)
-
+        st.warning("Bitte erstellen Sie einen neuen Chat oder wählen Sie einenvorhandenen Chat aus.")
+        
 if __name__ == "__main__":
     app()
