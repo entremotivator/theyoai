@@ -3,13 +3,15 @@ import openai
 import json
 import os
 from datetime import datetime
+from pathlib import Path
 from typing import List
 
 # Configure your OpenAI API settings
-openai.api_base = 'http://localhost:1234/v1'
+openai.api_key = os.getenv("OPENAI_API_KEY", "")
+openai.api_base = 'https://api.openai.com/v1'
 
 # Function to retrieve completions
-def get_completion(prompt, model="local model", temperature=0.0, api_key=''):
+def get_completion(prompt, model="local model", temperature=0.0):
     prefix = "### Instruction:\n"
     suffix = "\n### Response:"
     formatted_prompt = f"{prefix}{prompt}{suffix}"
@@ -17,19 +19,19 @@ def get_completion(prompt, model="local model", temperature=0.0, api_key=''):
     response = openai.ChatCompletion.create(
         model=model,
         messages=messages,
-        temperature=temperature,
-        api_key=api_key
+        temperature=temperature
     )
     return response.choices[0].message["content"]
 
 # Function for session index
 def save_chat_history(session_key: str, chat_history: List[dict]):
-    with open(os.path.join('chat_data', f'{session_key}_chat_history.json'), 'w') as f:
+    file_path = Path('chat_data') / f'{session_key}_chat_history.json'
+    with open(file_path, 'w') as f:
         json.dump(chat_history, f)
 
 def load_chat_history(session_key: str) -> List[dict]:
     try:
-        with open(os.path.join('chat_data', f'{session_key}_chat_history.json'), 'r') as f:
+        with open(Path('chat_data') / f'{session_key}_chat_history.json', 'r') as f:
             chat_history = json.load(f)
     except FileNotFoundError:
         chat_history = []
@@ -37,7 +39,7 @@ def load_chat_history(session_key: str) -> List[dict]:
 
 def save_session_index(session_key: str):
     try:
-        with open(os.path.join('chat_data', 'session_index.json'), 'r') as f:
+        with open(Path('chat_data') / 'session_index.json', 'r') as f:
             session_index = json.load(f)
     except FileNotFoundError:
         session_index = []
@@ -46,12 +48,16 @@ def save_session_index(session_key: str):
         "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "link": f'{session_key}_chat_history.json'
     })
-    with open(os.path.join('chat_data', 'session_index.json'), 'w') as f:
+    with open(Path('chat_data') / 'session_index.json', 'w') as f:
         json.dump(session_index, f)
 
-def app(api_key=''):
+def app():
     st.title("Jarvis Chatbot")
     os.makedirs('chat_data', exist_ok=True)
+
+    if not openai.api_key:
+        st.warning("Please set your OpenAI API key.")
+        return
 
     st.sidebar.title("Neuer Chat")
     neuer_chat_name = st.sidebar.text_input("Name für neuen Chat:", value="Chatname?", key="neuer_chat_name_sidebar")
@@ -61,11 +67,11 @@ def app(api_key=''):
         save_chat_history(st.session_state['session_key'], [])  # Create a new empty chat history file
         save_session_index(st.session_state['session_key'])
 
-    st.sidebar.markdown("---")  # Separator
+    st.sidebar.markdown("---", unsafe_allow_html=True)  # Separator
     st.sidebar.header("Chatverlauf")  # Chat history header
 
     try:
-        with open(os.path.join('chat_data', 'session_index.json'), 'r') as f:
+        with open(Path('chat_data') / 'session_index.json', 'r') as f:
             session_index = json.load(f)
     except FileNotFoundError:
         session_index = []
@@ -80,20 +86,19 @@ def app(api_key=''):
 
         user_input = st.text_input("Sie:")
         if user_input:
-            response = get_completion(user_input, api_key=api_key)
-            chat_history.append({"role": "user", "message": user_input})
-            chat_history.append({"role": "Jarvis", "message": response})
+            response = get_completion(user_input)
+            chat_history.append({"sender": "user", "message": user_input})
+            chat_history.append({"sender": "Jarvis", "message": response})
             save_chat_history(st.session_state['session_key'], chat_history)
 
         for chat in chat_history:
-            role = chat["role"]
+            sender = chat["sender"]
             message = chat["message"]
             with st.beta_container():
-                st.text(role)
+                st.text(sender)
                 st.text(message)
-                    else:
-        st.warning("Bitte erstellen Sie einen neuen Chat oder wählen Sie einen vorhandenen Chat aus.")
-
+    else:
+        st.warning("Bitte erstellen Sie einen neuen Chat oder wählen Sie einenvorhandenen Chat aus.")
+        
 if __name__ == "__main__":
-    api_key = st.text_input("OpenAI API Key", type="password")
-    app(api_key=api_key)
+    app()
