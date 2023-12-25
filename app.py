@@ -7,10 +7,9 @@ from typing import List
 
 # Configure your OpenAI API settings
 openai.api_base = 'http://localhost:1234/v1'
-openai.api_key = ''
 
 # Function to retrieve completions
-def get_completion(prompt, model="local model", temperature=0.0):
+def get_completion(prompt, model="local model", temperature=0.0, api_key=''):
     prefix = "### Instruction:\n"
     suffix = "\n### Response:"
     formatted_prompt = f"{prefix}{prompt}{suffix}"
@@ -18,7 +17,8 @@ def get_completion(prompt, model="local model", temperature=0.0):
     response = openai.ChatCompletion.create(
         model=model,
         messages=messages,
-        temperature=temperature
+        temperature=temperature,
+        api_key=api_key
     )
     return response.choices[0].message["content"]
 
@@ -49,7 +49,7 @@ def save_session_index(session_key: str):
     with open(os.path.join('chat_data', 'session_index.json'), 'w') as f:
         json.dump(session_index, f)
 
-def app():
+def app(api_key=''):
     st.title("Jarvis Chatbot")
     os.makedirs('chat_data', exist_ok=True)
 
@@ -80,7 +80,7 @@ def app():
 
         user_input = st.text_input("Sie:")
         if user_input:
-            response = get_completion(user_input)
+            response = get_completion(user_input, api_key=api_key)
             chat_history.append({"role": "user", "message": user_input})
             chat_history.append({"role": "Jarvis", "message": response})
             save_chat_history(st.session_state['session_key'], chat_history)
@@ -91,8 +91,9 @@ def app():
             with st.beta_container():
                 st.text(role)
                 st.text(message)
-    else:
-        st.warning("Bitte erstellen Sie einen neuen Chat oder wählen Sie einenvorhandenen Chat aus.")
-        
+                    else:
+        st.warning("Bitte erstellen Sie einen neuen Chat oder wählen Sie einen vorhandenen Chat aus.")
+
 if __name__ == "__main__":
-    app()
+    api_key = st.text_input("OpenAI API Key", type="password")
+    app(api_key=api_key)
